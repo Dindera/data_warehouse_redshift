@@ -5,62 +5,230 @@ import configparser
 config = configparser.ConfigParser()
 config.read('dwh.cfg')
 
+DWH_ROLE_ARN = config.get("IAM_ROLE", "ARN")
+
 # DROP TABLES
 
-staging_events_table_drop = ""
-staging_songs_table_drop = ""
-songplay_table_drop = ""
-user_table_drop = ""
-song_table_drop = ""
-artist_table_drop = ""
-time_table_drop = ""
+staging_events_table_drop = "DROP TABLE IF EXISTS events"
+staging_songs_table_drop = "DROP TABLE IF EXISTS staging_songs"
+songplay_table_drop = "DROP TABLE IF EXISTS songplays"
+user_table_drop = "DROP TABLE IF EXISTS users"
+song_table_drop = "DROP TABLE IF EXISTS songs"
+artist_table_drop = "DROP TABLE IF EXISTS artists"
+time_table_drop = "DROP TABLE IF EXISTS time"
 
 # CREATE TABLES
 
 staging_events_table_create= ("""
+CREATE TABLE IF NOT EXISTS staging_events (
+  artist VARCHAR,
+  auth VARCHAR,
+  first_name VARCHAR,
+  gender VARCHAR,
+  itemInSession INT,
+  last_name VARCHAR,
+  length FLOAT,
+  level VARCHAR,
+  method VARCHAR,
+  page VARCHAR,
+  registration FLOAT,
+  sessionId INT,
+  song VARCHAR,
+  status INT,
+  ts INT,
+  userAgent VARCHAR,
+  userId INT
+);
 """)
 
 staging_songs_table_create = ("""
+CREATE TABLE IF NOT EXISTS staging_songs (
+  num_songs INT,
+  artist_id VARCHAR,
+  artist_latitude NUMERIC,
+  artist_longitude NUMERIC,
+  artist_location VARCHAR,
+  artist_name VARCHAR,
+  song_id VARCHAR,
+  title VARCHAR,
+  duration FLOAT,
+  year INT
+);
 """)
 
 songplay_table_create = ("""
+CREATE TABLE IF NOT EXISTS songplays (
+  songplay_id INT PRIMARY KEY,
+  start_time TIMESTAMP NOT NULL,
+  user_id INT NOT NULL,
+  level VARCHAR,
+  song_id VARCHAR,
+  artist_id VARCHAR,
+  session_id INT,
+  location VARCHAR,
+  user_agent VARCHAR
+);
 """)
 
 user_table_create = ("""
+CREATE TABLE IF NOT EXISTS users (
+  user_id INT PRIMARY KEY,
+  first_name VARCHAR,
+  last_name VARCHAR,
+  gender VARCHAR,
+  level VARCHAR
+);
 """)
 
 song_table_create = ("""
+CREATE TABLE IF NOT EXISTS songs (
+  song_id VARCHAR PRIMARY KEY,
+  title VARCHAR NOT NULL,
+  artist_id INT,
+  year INT, 
+  duration NUMERIC NOT NULL
+);
 """)
 
 artist_table_create = ("""
+CREATE TABLE IF NOT EXISTS artists (
+  artist_id VARCHAR PRIMARY KEY,
+  name VARCHAR NOT NULL,
+  location VARCHAR,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION
+);
 """)
 
 time_table_create = ("""
+CREATE TABLE IF NOT EXISTS time (
+  start_time TIMESTAMP PRIMARY KEY,
+  hour INT,
+  day INT,
+  week INT,
+  month INT,
+  year INT,
+  weekday INT
+);
 """)
 
 # STAGING TABLES
 
-staging_events_copy = ("""
-""").format()
+staging_events_copy = (
+""" 
+  COPY staging_events FROM 's3://udacity-dend/log_data'
+  iam_role {}
+  REGION 'us-west-2'
+  JSON 'auto'
+""").format(DWH_ROLE_ARN)
 
-staging_songs_copy = ("""
-""").format()
+staging_songs_copy = (
+"""
+  COPY staging_songs FROM 's3://udacity-dend/song_data'
+  iam_role {}
+  REGION 'us-west-2'
+  JSON 'auto' 
+""").format(DWH_ROLE_ARN)
 
 # FINAL TABLES
 
-songplay_table_insert = ("""
+songplay_table_insert = (
+"""
+INSERT INTO songplays (
+  start_time,
+  user_id
+  level,
+  song_id,
+  artist_id,
+  session_id,
+  location,
+  userAgent
+)
+(SELECT 
+  se.ts, 
+  se.userId, 
+  se.level,
+  ss.song_id,
+  ss.artist_id,
+  se.sessionId,
+  ss.location,
+  se.userAgent    
+FROM staging_events se
+JOIN staging_songs ss ON se.artist = ss.artist_name)
 """)
 
-user_table_insert = ("""
+user_table_insert = (
+"""
+INSERT INTO users (
+  user_id,
+  first_name,
+  last_name,
+  gender,
+  level
+)
+(SELECT 
+  userId,
+  first_name,
+  last_name,
+  gender,
+  level
+FROM staging_events)
 """)
 
-song_table_insert = ("""
+song_table_insert = (
+"""
+INSERT INTO songs (
+  song_id,
+  title,
+  artist_id,
+  year,
+  duration
+)
+(SELECT
+  song_id,
+  title,
+  artist_id,
+  year,
+  duration
+FROM staging_songs)
 """)
 
-artist_table_insert = ("""
+artist_table_insert = (
+"""
+INSERT INTO artists (
+  artist_id,
+  name,
+  location,
+  latitude,
+  longitude
+)
+(SELECT 
+  DISTINCT(artist_id),
+  artist_name,
+  artist_location,
+  artist_latitude,
+  artist_longitude
+FROM staging_songs)
 """)
 
-time_table_insert = ("""
+time_table_insert = (
+"""
+INSERT INTO time (
+  start_time,
+  hour,
+  day,
+  month,
+  year,
+  weekday
+)
+(SELECT 
+  ts,
+  EXTRACT(HOUR FROM ts),
+  EXTRACT(DAY FROM ts),
+  EXTRACT(MONTH FROM ts),
+  EXTRACT(YEAR FROM ts),
+  EXTRACT(WEEK FROM ts)
+FROM staging_events
 """)
 
 # QUERY LISTS
