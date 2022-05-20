@@ -6,10 +6,13 @@ config = configparser.ConfigParser()
 config.read('dwh.cfg')
 
 DWH_ROLE_ARN = config.get("IAM_ROLE", "ARN")
+LOG_DATA = config.get("S3", "LOG_DATA")
+LOG_JSONPATH = config.get("S3", "LOG_JSONPATH")
+SONG_DATA = config.get("S3","SONG_DATA")
 
 # DROP TABLES
 
-staging_events_table_drop = "DROP TABLE IF EXISTS events"
+staging_events_table_drop = "DROP TABLE IF EXISTS staging_events"
 staging_songs_table_drop = "DROP TABLE IF EXISTS staging_songs"
 songplay_table_drop = "DROP TABLE IF EXISTS songplays"
 user_table_drop = "DROP TABLE IF EXISTS users"
@@ -29,13 +32,14 @@ CREATE TABLE IF NOT EXISTS staging_events (
   last_name VARCHAR,
   length FLOAT,
   level VARCHAR,
+  location VARCHAR,
   method VARCHAR,
   page VARCHAR,
   registration FLOAT,
   sessionId INT,
   song VARCHAR,
   status INT,
-  ts INT,
+  ts BIGINT,
   userAgent VARCHAR,
   userId INT
 );
@@ -58,7 +62,7 @@ CREATE TABLE IF NOT EXISTS staging_songs (
 
 songplay_table_create = ("""
 CREATE TABLE IF NOT EXISTS songplays (
-  songplay_id INT PRIMARY KEY,
+  songplay_id INT IDENTITY(0, 1) PRIMARY KEY,
   start_time TIMESTAMP NOT NULL,
   user_id INT NOT NULL,
   level VARCHAR,
@@ -84,7 +88,7 @@ song_table_create = ("""
 CREATE TABLE IF NOT EXISTS songs (
   song_id VARCHAR PRIMARY KEY,
   title VARCHAR NOT NULL,
-  artist_id INT,
+  artist_id VARCHAR,
   year INT, 
   duration NUMERIC NOT NULL
 );
@@ -116,19 +120,19 @@ CREATE TABLE IF NOT EXISTS time (
 
 staging_events_copy = (
 """ 
-  COPY staging_events FROM 's3://udacity-dend/log_data'
+  COPY staging_events FROM {}
   iam_role {}
   REGION 'us-west-2'
-  JSON 'auto'
-""").format(DWH_ROLE_ARN)
+  JSON {}
+""").format(LOG_DATA, DWH_ROLE_ARN, LOG_JSONPATH)
 
 staging_songs_copy = (
 """
-  COPY staging_songs FROM 's3://udacity-dend/song_data'
+  COPY staging_songs FROM {}
   iam_role {}
   REGION 'us-west-2'
   JSON 'auto' 
-""").format(DWH_ROLE_ARN)
+""").format(SONG_DATA, DWH_ROLE_ARN)
 
 # FINAL TABLES
 
@@ -154,7 +158,8 @@ INSERT INTO songplays (
   ss.location,
   se.userAgent    
 FROM staging_events se
-JOIN staging_songs ss ON se.artist = ss.artist_name)
+JOIN staging_songs ss ON se.artist = ss.artist_name
+WHERE se.page='NextSong')
 """)
 
 user_table_insert = (
@@ -166,13 +171,13 @@ INSERT INTO users (
   gender,
   level
 )
-(SELECT 
+(SELECT DISTINCT 
   userId,
   first_name,
   last_name,
   gender,
   level
-FROM staging_events)
+FROM staging_events WHERE page='NextSong')
 """)
 
 song_table_insert = (
@@ -222,13 +227,14 @@ INSERT INTO time (
   weekday
 )
 (SELECT 
-  ts,
+  DISTINCT ts,
   EXTRACT(HOUR FROM ts),
   EXTRACT(DAY FROM ts),
   EXTRACT(MONTH FROM ts),
   EXTRACT(YEAR FROM ts),
   EXTRACT(WEEK FROM ts)
-FROM staging_events
+FROM (SELECT (TIMESTAMP 'epoch'+ ts/1000 * INTERVAL '1 Second') as ts
+FROM staging_events)
 """)
 
 # QUERY LISTS
