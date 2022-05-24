@@ -1,13 +1,13 @@
 
 ## Sparkify Data Warehouse Redshift - DE Nanodegree Project
 
----
+
 
 
 The purpose of this project is to develop a data warehouse on AWS Redshift. The data warehouse is built by creating a Redshift cluster which can be connected with using the IAM role, cluster credentials and access keys. The two datasets are first loaded into the staging tables from the S3 bucket. Data from the staging tables are then transformed and inserted into the fact and dimension tables respectively. The database is modelled based on Kimball's dimensional modelling and it includes the fact table songplays, the dimension tables songs, users, artists and time. 
 
 
----
+
 
 ### Summary of files
 
