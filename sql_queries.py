@@ -63,8 +63,8 @@ CREATE TABLE IF NOT EXISTS staging_songs (
 songplay_table_create = ("""
 CREATE TABLE IF NOT EXISTS songplays (
   songplay_id INT IDENTITY(0, 1) PRIMARY KEY,
-  start_time TIMESTAMP NOT NULL,
-  user_id INT NOT NULL,
+  start_time BIGINT NOT NULL sortkey,
+  user_id INT NOT NULL distkey,
   level VARCHAR,
   song_id VARCHAR,
   artist_id VARCHAR,
@@ -140,13 +140,13 @@ songplay_table_insert = (
 """
 INSERT INTO songplays (
   start_time,
-  user_id
+  user_id,
   level,
   song_id,
   artist_id,
   session_id,
   location,
-  userAgent
+  user_agent
 )
 (SELECT 
   se.ts, 
@@ -155,7 +155,7 @@ INSERT INTO songplays (
   ss.song_id,
   ss.artist_id,
   se.sessionId,
-  ss.location,
+  se.location,
   se.userAgent    
 FROM staging_events se
 JOIN staging_songs ss ON se.artist = ss.artist_name
@@ -190,7 +190,7 @@ INSERT INTO songs (
   duration
 )
 (SELECT
-  song_id,
+  DISTINCT song_id,
   title,
   artist_id,
   year,
@@ -232,9 +232,10 @@ INSERT INTO time (
   EXTRACT(DAY FROM ts),
   EXTRACT(MONTH FROM ts),
   EXTRACT(YEAR FROM ts),
-  EXTRACT(WEEK FROM ts)
+  EXTRACT(WEEKDAY FROM ts)
 FROM (SELECT (TIMESTAMP 'epoch'+ ts/1000 * INTERVAL '1 Second') as ts
 FROM staging_events)
+)
 """)
 
 # QUERY LISTS
