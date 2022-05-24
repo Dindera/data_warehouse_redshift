@@ -4,18 +4,29 @@ from sql_queries import create_table_queries, drop_table_queries
 
 
 def drop_tables(cur, conn):
+    """
+    - Executes queries to drop tables initially created  
+    """
     for query in drop_table_queries:
         cur.execute(query)
         conn.commit()
 
 
 def create_tables(cur, conn):
+    """
+    - Executes queries to create tables if not exists
+    """
     for query in create_table_queries:
         cur.execute(query)
         conn.commit()
 
 
 def main():
+    """
+    - Reads the database cluster credentials
+    - Connects to the database cluster
+    - Executes the drop_tables and create_tables functions
+    """
     config = configparser.ConfigParser()
     config.read('dwh.cfg')
 
